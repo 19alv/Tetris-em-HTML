@@ -58,9 +58,8 @@ intervalo_ms = max(50, 800 * 0.82 ** (nivel - 1))
 | `lock()` | Fixa a peça, remove linhas completas e sorteia a próxima |
 | `loop()` | Laço principal: faz a peça cair no ritmo do nível e redesenha a tela |
 
-## Próximos passos
+## Próximos Updates
 
-- [ ] Reescrever em Python com **pygame**
 - [ ] Guardar a maior pontuação
 - [ ] Adicionar sons
 - [ ] Criar tela de menu
