@@ -1,0 +1,105 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Tetris</title>
+<style>
+:root{--bg:#f2f4f7;--panel:#fff;--ink:#1c2430;--grid:#e3e7ee;--accent:#2b6cff;box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}
+@media (prefers-color-scheme: dark){:root:not([data-theme="light"]){--bg:#12161d;--panel:#1b212b;--ink:#e8ecf2;--grid:#262e3b;--accent:#6b9bff}}
+:root[data-theme="dark"]{--bg:#12161d;--panel:#1b212b;--ink:#e8ecf2;--grid:#262e3b;--accent:#6b9bff}
+html,body{margin:0;background:var(--bg);color:var(--ink);font-family:system-ui,-apple-system,"Segoe UI",sans-serif}
+body{display:flex;justify-content:center;padding:16px}
+.wrap{display:flex;gap:16px;align-items:flex-start;flex-wrap:wrap;justify-content:center}
+canvas{background:var(--panel);border-radius:10px;max-width:100%}
+.side{background:var(--panel);border-radius:10px;padding:16px;width:180px}
+.side p{margin:0 0 4px;font-size:13px;opacity:.7}
+.side h2{margin:0 0 14px;font-size:26px}
+button{background:var(--accent);color:#fff;border:0;border-radius:8px;padding:10px 14px;font-size:15px;cursor:pointer;width:100%;margin-top:6px}
+.keys{font-size:13px;line-height:1.7;margin-top:14px}
+.pad{display:grid;grid-template-columns:repeat(4,1fr);gap:6px;margin-top:10px}
+.pad button{margin:0;padding:12px 0}
+</style>
+</head>
+<body>
+<div class="wrap">
+<canvas id="c" width="300" height="600"></canvas>
+<div class="side">
+<p>Pontos</p><h2 id="s">0</h2>
+<p>Linhas</p><h2 id="l">0</h2>
+<p>Nível</p><h2 id="v">1</h2>
+<canvas id="n" width="120" height="90" style="background:var(--bg)"></canvas>
+<button id="go">Começar</button>
+<div class="keys">← → mover<br>↑ girar<br>↓ descer<br>Espaço: queda direta<br>P: pausar</div>
+<div class="pad">
+<button data-k="L">←</button><button data-k="R">→</button><button data-k="U">⟳</button><button data-k="D">↓</button>
+</div>
+</div>
+</div>
+<script>
+const COLS=10,ROWS=20,S=30;
+const cv=document.getElementById('c'),ctx=cv.getContext('2d');
+const nv=document.getElementById('n'),nctx=nv.getContext('2d');
+const SHAPES={
+I:[[1,1,1,1]],O:[[1,1],[1,1]],T:[[0,1,0],[1,1,1]],
+S:[[0,1,1],[1,1,0]],Z:[[1,1,0],[0,1,1]],J:[[1,0,0],[1,1,1]],L:[[0,0,1],[1,1,1]]};
+const COLORS={I:'#2bb8d9',O:'#f2c230',T:'#a15bd6',S:'#3fb865',Z:'#e5484d',J:'#2b6cff',L:'#f08a24'};
+let board,cur,next,score,lines,level,over,paused,running,last,acc;
+const rnd=()=>{const k=Object.keys(SHAPES)[Math.floor(Math.random()*7)];return{k,m:SHAPES[k].map(r=>[...r]),x:0,y:0}};
+const spawn=p=>{p.x=Math.floor((COLS-p.m[0].length)/2);p.y=0;return p};
+const rot=m=>m[0].map((_,i)=>m.map(r=>r[i]).reverse());
+function hit(p,dx=0,dy=0,m=p.m){
+for(let y=0;y<m.length;y++)for(let x=0;x<m[y].length;x++){
+if(!m[y][x])continue;const nx=p.x+x+dx,ny=p.y+y+dy;
+if(nx<0||nx>=COLS||ny>=ROWS)return true;
+if(ny>=0&&board[ny][nx])return true}return false}
+function reset(){board=Array.from({length:ROWS},()=>Array(COLS).fill(null));score=0;lines=0;level=1;over=false;paused=false;cur=spawn(rnd());next=rnd();acc=0;last=performance.now();upd()}
+function lock(){
+cur.m.forEach((r,y)=>r.forEach((v,x)=>{if(v&&cur.y+y>=0)board[cur.y+y][cur.x+x]=cur.k}));
+let c=0;
+for(let y=ROWS-1;y>=0;y--){if(board[y].every(Boolean)){board.splice(y,1);board.unshift(Array(COLS).fill(null));c++;y++}}
+if(c){score+=[0,100,300,500,800][c]*level;lines+=c;level=1+Math.floor(lines/10)}
+cur=spawn(next);next=rnd();
+if(hit(cur)){over=true;running=false;document.getElementById('go').textContent='Jogar de novo'}
+upd()}
+function move(dx){if(!hit(cur,dx,0))cur.x+=dx}
+function drop(){if(!hit(cur,0,1)){cur.y++;return true}lock();return false}
+function turn(){const m=rot(cur.m);for(const k of [0,-1,1,-2,2]){if(!hit(cur,k,0,m)){cur.m=m;cur.x+=k;return}}}
+function hard(){while(drop());score+=2}
+function upd(){document.getElementById('s').textContent=score;document.getElementById('l').textContent=lines;document.getElementById('v').textContent=level}
+function cell(c,x,y,k,s=S){c.fillStyle=COLORS[k];c.fillRect(x*s+1,y*s+1,s-2,s-2)}
+function draw(){
+const g=getComputedStyle(document.documentElement).getPropertyValue('--grid');
+ctx.clearRect(0,0,cv.width,cv.height);
+ctx.strokeStyle=g;ctx.lineWidth=1;
+for(let x=1;x<COLS;x++){ctx.beginPath();ctx.moveTo(x*S,0);ctx.lineTo(x*S,ROWS*S);ctx.stroke()}
+for(let y=1;y<ROWS;y++){ctx.beginPath();ctx.moveTo(0,y*S);ctx.lineTo(COLS*S,y*S);ctx.stroke()}
+board.forEach((r,y)=>r.forEach((k,x)=>{if(k)cell(ctx,x,y,k)}));
+if(!over){
+let gy=0;while(!hit(cur,0,gy+1))gy++;
+cur.m.forEach((r,y)=>r.forEach((v,x)=>{if(v){ctx.globalAlpha=.2;cell(ctx,cur.x+x,cur.y+y+gy,cur.k);ctx.globalAlpha=1;cell(ctx,cur.x+x,cur.y+y,cur.k)}}))}
+nctx.clearRect(0,0,120,90);
+const w=next.m[0].length,h=next.m.length,s=24;
+next.m.forEach((r,y)=>r.forEach((v,x)=>{if(v){nctx.fillStyle=COLORS[next.k];nctx.fillRect((120-w*s)/2+x*s+1,(90-h*s)/2+y*s+1,s-2,s-2)}}));
+if(over||paused||!running){
+ctx.fillStyle='rgba(0,0,0,.55)';ctx.fillRect(0,0,cv.width,cv.height);
+ctx.fillStyle='#fff';ctx.font='bold 26px system-ui';ctx.textAlign='center';
+ctx.fillText(over?'Fim de jogo':paused?'Pausado':'Pronto?',150,300)}}
+function loop(t){
+if(running&&!paused){acc+=t-last;const iv=Math.max(50,800*Math.pow(0.82,level-1));
+while(acc>iv){acc-=iv;drop()}}
+last=t;draw();requestAnimationFrame(loop)}
+function act(k){
+if(!running||paused)return;
+if(k==='L')move(-1);else if(k==='R')move(1);else if(k==='U')turn();
+else if(k==='D'){if(drop())score++;upd()}else if(k==='H'){hard();upd()}}
+document.addEventListener('keydown',e=>{
+const m={ArrowLeft:'L',ArrowRight:'R',ArrowUp:'U',ArrowDown:'D',' ':'H'}[e.key];
+if(m){e.preventDefault();act(m)}
+if(e.key==='p'||e.key==='P'){if(running)paused=!paused}});
+document.querySelectorAll('.pad button').forEach(b=>b.onclick=()=>act(b.dataset.k));
+document.getElementById('go').onclick=function(){reset();running=true;this.textContent='Reiniciar'};
+reset();running=false;requestAnimationFrame(loop);
+</script>
+</body>
+</html>
